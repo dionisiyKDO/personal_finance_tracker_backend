@@ -18,10 +18,13 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
+    # admin:
     path('admin/', admin.site.urls),
+
+    # Login endpoint:
+    path('api/auth/', include('accounts.urls')),
+    
+    # Apps:
     path('api/transactions/', include('transactions.urls')),
-    path('api/budgets/', include('budgets.urls')),
     path('api/dashboard-data/', include('analytics.urls')),
-    # path('api/analytics/', include('analytics.urls')),
-    # For authentication endpoints, you can add similar routes.
 ]

@@ -1,41 +1,107 @@
 from django.db import models
 from django.contrib.auth.models import User
-
-class Category(models.Model):
-    name = models.CharField(max_length=50)
-    # Optional: If you want categories to be user-specific, associate with a user.
-    # Leave blank (or null) for global categories.
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-
-    def __str__(self):
-        return self.name
+from django.utils import timezone
 
 class Transaction(models.Model):
     TRANSACTION_TYPES = [
         ('expense', 'Expense'),
         ('income', 'Income'),
     ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    type = models.CharField(max_length=7, choices=TRANSACTION_TYPES)
-    # Allow blank=True if a transaction might not have a category assigned.
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
-    description = models.TextField(blank=True)
-    date = models.DateField()
-
+    CATEGORY_TYPES = [
+        ('entertainment', 'Entertainment'),
+        ('digital_goods', 'Digital Goods'),
+        ('food_drink', 'Food & Drink'),
+        ('other', 'Other'),
+    ]
+    
+    # Required fields
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='transactions'
+    )
+    date = models.DateTimeField(default=timezone.now)
+    type = models.CharField(
+        max_length=7, 
+        choices=TRANSACTION_TYPES,
+        db_index=True  # index for frequent filtering
+    )
+    amount = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2,
+        help_text="Amount in card primary currency"
+    )
+    
+    # Optional fields with proper null/blank handling
+    card = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True,
+        help_text="Card identifier if multiple cards exist"
+    )
+    category = models.CharField(
+        max_length=128, 
+        choices=CATEGORY_TYPES,
+        null=True,
+        blank=True
+    )
+    description = models.TextField(
+        null=True, 
+        blank=True,
+    )
+    
+    # Currency related fields
+    currency = models.CharField(
+        max_length=10, 
+        null=True, 
+        blank=True,
+        help_text="e.g., UAH, USD"
+    )
+    original_amount = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2, 
+        null=True, 
+        blank=True
+    )
+    original_currency = models.CharField(
+        max_length=10, 
+        null=True, 
+        blank=True
+    )
+    balance_after_transaction = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2, 
+        null=True, 
+        blank=True
+    )
+    
+    # Metadata fields
+    vendor = models.CharField(
+        max_length=255, 
+        null=True, 
+        blank=True
+    )
+    transaction_source = models.CharField(
+        max_length=100, 
+        null=True, 
+        blank=True
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['user', 'date']),
+            models.Index(fields=['type', 'date']),
+        ]
+    
     def __str__(self):
-        return f"{self.get_type_display()} - {self.amount}"
-
-# Category Model:
-
-#     name: Holds the category’s name (e.g., “Food”, “Salary”).
-#     user: (Optional) Links a category to a specific user. If left null or blank, you can treat the category as a global option.
-
-# Transaction Model:
-
-#     user: Each transaction is tied to a user.
-#     amount: A decimal field to store monetary values.
-#     type: A choice field to indicate if the transaction is an expense or income.
-#     category: A foreign key linking to a Category. Uses SET_NULL so that if a category is deleted, the transaction isn’t removed.
-#     description: Additional text details about the transaction.
-#     date: The date the transaction occurred.
+        return f"{self.date.strftime('%Y-%m-%d %H:%M')} - {self.amount} {self.currency or 'N/A'}"
+        
+    def save(self, *args, **kwargs):
+        if not self.currency and self.original_currency:
+            self.currency = self.original_currency
+        super().save(*args, **kwargs)
