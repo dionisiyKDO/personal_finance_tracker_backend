@@ -151,10 +151,10 @@ USE_TZ = True
 # STATIC_ROOT = BASE_DIR / 'staticfiles'  # For collectstatic
 
 # settings.py
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Adjust as needed
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static/frontend/_app'),  # Point to your SvelteKit output
+    os.path.join(BASE_DIR, STATIC_URL),  # Point to your SvelteKit output
 ]
 
 # Default primary key field type
