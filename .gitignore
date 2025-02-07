@@ -1,4 +1,5 @@
 privat.csv
+/staticfiles
 
 # Django #
 *.log

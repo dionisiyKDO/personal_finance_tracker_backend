@@ -27,4 +27,17 @@ urlpatterns = [
     # Apps:
     path('api/transactions/', include('transactions.urls')),
     path('api/dashboard-data/', include('analytics.urls')),
+    
+    # Frontend:
+    path('', include('frontend.urls')),
 ]
+
+
+		# <link rel="modulepreload" href="/_app/immutable/entry/start.CNk4m-yS.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/B6At5cn5.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/DiOX1np-.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/CYlZKh32.js">
+		# <link rel="modulepreload" href="/_app/immutable/entry/app.BZRGh4Pb.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/9GPvL92g.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/Byjy3L_i.js">
+		# <link rel="modulepreload" href="/_app/immutable/chunks/Cyrhthi-.js">
