@@ -60,12 +60,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
     'http://localhost:5147',
     'http://127.0.0.1:5147',
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -154,7 +157,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Adjust as needed
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, STATIC_URL),  # Point to your SvelteKit output
+    os.path.join(BASE_DIR, STATIC_URL),
+    os.path.join(BASE_DIR, STATIC_URL, 'frontend'),
+    os.path.join(STATIC_ROOT, 'frontend'),  # Point to your SvelteKit output
 ]
 
 # Default primary key field type
