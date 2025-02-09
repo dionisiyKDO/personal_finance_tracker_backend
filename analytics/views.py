@@ -24,7 +24,7 @@ def dashboard_data(request):
         
         # Get time period
         end_date = timezone.now()
-        period = request.GET.get('period', '30d')
+        period = request.GET.get('period', 'all')
         
         if period == '7d':
             start_date = end_date - timedelta(days=7)
@@ -34,6 +34,8 @@ def dashboard_data(request):
             start_date = end_date - timedelta(days=90)
         elif period == '1y':
             start_date = end_date - timedelta(days=365)
+        elif period == 'all':
+            start_date = None
         else:
             try:
                 start_date = request.GET.get('start_date')
@@ -57,7 +59,7 @@ def dashboard_data(request):
         return Response({
             'data': json_data,
             'period': {
-                'start_date': start_date.isoformat(),
+                'start_date': start_date.isoformat() if start_date else None,
                 'end_date': end_date.isoformat()
             }
         })
