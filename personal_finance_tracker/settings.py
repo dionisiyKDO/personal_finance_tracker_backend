@@ -143,23 +143,10 @@ USE_I18N = True
 
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-# STATIC_URL = 'static/'
-# STATICFILES_DIRS = [
-#     BASE_DIR / 'static',  # This is where your Svelte build files are
-# ]
-# STATIC_ROOT = BASE_DIR / 'staticfiles'  # For collectstatic
-
-# settings.py
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Adjust as needed
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, STATIC_URL),
-    os.path.join(BASE_DIR, STATIC_URL, 'frontend'),
-    os.path.join(STATIC_ROOT, 'frontend'),  # Point to your SvelteKit output
 ]
 
 # Default primary key field type

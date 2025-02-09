@@ -21,7 +21,7 @@ urlpatterns = [
     # admin:
     path('admin/', admin.site.urls),
 
-    # Login endpoint:
+    # Auth endpoints:
     path('api/auth/', include('accounts.urls')),
     
     # Apps:
