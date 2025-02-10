@@ -42,11 +42,34 @@ def get_category_breakdown(user, transaction_type='expense', start_date=None, en
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
 
-    return list(queryset.values('category').annotate(
-        total=Sum('amount'),
-        count=Count('id'),
-        avg=Avg('amount')
-    ).order_by('-total'))
+    all_categories = []
+    transactions = queryset.values_list('category', 'amount')
+    
+    print('Transaction type:', transaction_type, end='\n\n')
+    print('All transactions', transactions, sep='\n', end='\n\n')
+    print('First transaction', transactions[0], sep='\n', end='\n\n')
+    
+    for categories, amount in transactions:
+        if isinstance(categories, str):
+            for category in categories.split('/'):
+                category = category.strip()
+                all_categories.append((category, amount))
+
+    # Aggregate
+    category_totals = {}
+    for category, amount in all_categories:
+        if category not in category_totals:
+            category_totals[category] = {'total': 0, 'count': 0}
+        category_totals[category]['total'] += amount
+        category_totals[category]['count'] += 1
+
+    # Convert to list & calculate averages
+    result = [
+        {'category': cat, 'total': data['total'], 'count': data['count'], 'avg': data['total'] / data['count']}
+        for cat, data in category_totals.items()
+    ]
+    
+    return sorted(result, key=lambda x: -x['total'])
 
 def get_monthly_trends(user, months=12):
     end_date = timezone.now()
@@ -109,7 +132,7 @@ def generate_dashboard_data(user, start_date=None, end_date=None):
     return {
         'basic_stats': get_basic_stats(user, start_date, end_date),
         'expense_categories': get_category_breakdown(user, 'expense', start_date, end_date),
-        'income_categories': get_category_breakdown(user, 'income', start_date, end_date),
+        # 'income_categories': get_category_breakdown(user, 'income', start_date, end_date),
         'monthly_trends': get_monthly_trends(user),
         'currencies': get_currency_exposure(user),
         'top_vendors': get_vendor_analysis(user),
