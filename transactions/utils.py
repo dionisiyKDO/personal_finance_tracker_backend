@@ -2,11 +2,12 @@ from django.contrib.auth.models import User
 from transactions.models import Transaction
 from django.utils import timezone
 import csv
+import re
 from datetime import datetime
 from decimal import Decimal
 
 def map_category(category):
-    """Maps PrivatBank categories to our model categories"""
+    """Map exported categories to our model categories"""
     category_mapping = {
         "Mobile Service Provider": "Necessary/Mobile",
         "MONO Bank (Ukraine)": "Finance/Banking",
@@ -41,15 +42,8 @@ def map_category(category):
 
 
 def map_vendor_name(vendor_name):
-    """
-    Maps a vendor name from a receipt to a more readable and understandable name.
-
-    Args:
-        vendor_name (str): The vendor name as it appears on the receipt.
-
-    Returns:
-        str: The mapped, readable vendor name.
-    """
+    """Maps a vendor name from a receipt to a more readable and understandable name"""
+    
     vendor_mapping = {
         "Мобильный": "Mobile Service Provider",
         "MONODirect KYIV UKR": "MONO Bank (Ukraine)",
@@ -109,21 +103,18 @@ def map_vendor_name(vendor_name):
         "Запорізька політехніка НУ (інші платежі)": "NU Zaporizhzhia Polytechnic (other payments)",
         "MOBILE BANKING, KYIV": "From Another Card",
     }
+    
+    
+    phone_pattern = r"^\+380\d{9}$"
+    if re.match(phone_pattern, vendor_name):
+        return "Phone Number"
 
     # Return the mapped name, or the original name if not found in the mapping
     return vendor_mapping.get(vendor_name, "Unknown")
 
 
 def import_privat_bank_csv(file_path):
-    """
-    Import transactions from PrivatBank CSV file.
-
-    Args:
-        file_path (str): Path to the CSV file
-
-    Returns:
-        tuple: (success_count, error_count, error_messages)
-    """
+    """Import transactions from PrivatBank CSV file."""
     superuser = User.objects.filter(is_superuser=True).first()
     if not superuser:
         raise ValueError("No superuser found in the database!")
@@ -134,8 +125,7 @@ def import_privat_bank_csv(file_path):
 
     try:
         with open(file_path, mode="r", encoding="utf-8") as file:
-            # Skip the first line as it contains the date range
-            next(file)
+            next(file) # Skip the first line as it contains the date range
 
             reader = csv.DictReader(file)
 
@@ -178,7 +168,7 @@ def import_privat_bank_csv(file_path):
                         date=date,
                         category=category,
                         card=row["Картка"],
-                        vendor=vendor,  # Remove asterisks
+                        vendor=vendor,
                         type=type,
                         amount=amount,
                         currency=row["Валюта картки"],
@@ -219,15 +209,7 @@ def import_privat_bank_csv(file_path):
 
 
 def import_oschad_csv(file_path: str):
-    """
-    Import transactions from an Oschad CSV file.
-
-    Args:
-        file_path (str): Path to the CSV file.
-
-    Returns:
-        tuple: (success_count, error_count, error_messages)
-    """
+    """Import transactions from an Oschad CSV file."""
     superuser = User.objects.filter(is_superuser=True).first()
     if not superuser:
         raise ValueError("No superuser found in the database!")
@@ -370,9 +352,7 @@ def import_oschad_csv(file_path: str):
 
 
 def recategorize_transactions():
-    """
-    Recategorize transactions based on the vendor name.
-    """
+    """Recategorize transactions based on the vendor name."""
     for transaction in Transaction.objects.all():
         print("Recategorizing transaction:", transaction.id)
         vendor = transaction.vendor

@@ -45,10 +45,6 @@ def get_category_breakdown(user, transaction_type='expense', start_date=None, en
     all_categories = []
     transactions = queryset.values_list('category', 'amount')
     
-    print('Transaction type:', transaction_type, end='\n\n')
-    print('All transactions', transactions, sep='\n', end='\n\n')
-    print('First transaction', transactions[0], sep='\n', end='\n\n')
-    
     for categories, amount in transactions:
         if isinstance(categories, str):
             for category in categories.split('/'):
