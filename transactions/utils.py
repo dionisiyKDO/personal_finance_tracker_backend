@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from decimal import Decimal
 
+# TODO: this is not needed, i think. I've made in model on_save mapping
 def map_category(category):
     """Map exported categories to our model categories"""
     category_mapping = {
@@ -40,7 +41,7 @@ def map_category(category):
     }
     return category_mapping.get(category, "Other")
 
-
+# TODO: make in model on_save mapping
 def map_vendor_name(vendor_name):
     """Maps a vendor name from a receipt to a more readable and understandable name"""
     

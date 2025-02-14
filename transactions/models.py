@@ -8,6 +8,37 @@ class Transaction(models.Model):
         ("expense", "Expense"),
         ("income", "Income"),
     ]
+    
+    CATEGORY_MAP = {
+        "Mobile Service Provider": "Necessary/Mobile",
+        "MONO Bank (Ukraine)": "Finance/Banking",
+        "Transfer to Another Card": "Finance/Transfers",
+        "From Another Card": "Finance/Transfers",
+        "NU Zaporizhzhia Polytechnic: Scholarship": "Income/Scholarship",
+        "Nova Poshta (Courier Service)": "Shopping/Delivery",
+        "Udemy": "Education/Online Courses",
+        "Terminal (ATM/POS)": "Finance/ATM",
+        "Google play (Duolingo)": "Subscription/Education",
+        "Rozetka (Online Store)": "Shopping/OnlineStore",
+        "Amazon Prime Video": "Subscription/Entertainment",
+        "MooGold (Gaming/Online Service)": "Gaming/Services",
+        "Zaporizhzhia Store (Ukraine)": "Shopping/LocalStore",
+        "Spotify": "Subscription/Music",
+        
+        "Steam": "Gaming",
+        "Xsolla (Epic Games)": "Gaming",
+        "HoYoverse": "Gaming/Gacha",
+        "Riot Games": "Gaming/InGameCurrency",
+        "Google (Yostar Games)": "Gaming/Gacha",
+        "Tower of Fantasy (Game)": "Gaming/Gacha",
+        "Infold Games": "Gaming/Gacha",
+        
+        "Xsolla (Twitch)": "Subscription/Entertainment",
+        "Xsolla (Payment Platform)": "Shopping/OnlineStore",
+        
+        "OschadBank (fee)": "Finance/BankFees",
+        "NU Zaporizhzhia Polytechnic (other payments)": "Education/University",
+    }
 
     # Required fields
     user = models.ForeignKey(
@@ -33,6 +64,7 @@ class Transaction(models.Model):
     category = models.CharField(
         max_length=128, null=True, blank=True
     )
+    
     description = models.TextField(
         null=True,
         blank=True,
@@ -71,4 +103,7 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         if not self.currency and self.original_currency:
             self.currency = self.original_currency
+        # TODO: check default category value
+        if self.vendor:
+            self.category = self.CATEGORY_MAP.get(self.vendor, "Uncategorized")
         super().save(*args, **kwargs)
