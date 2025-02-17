@@ -1,14 +1,50 @@
 from django.contrib.auth.models import User
-from transactions.models import Transaction
 from django.utils import timezone
-import csv
+
+from transactions.models import Transaction
+
 from datetime import datetime
 from decimal import Decimal
+import csv
+
+import warnings
+import logging
+import colorlog
+
+
+def init_logger():
+    """Initializes the logger with a custom format."""
+    log_format = "%(log_color)s%(levelname)s%(reset)s: %(asctime)s.%(msecs)03d - %(message)s%(reset)s"
+    color_formatter = colorlog.ColoredFormatter(
+        log_format,
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_red",
+        },
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(color_formatter)
+    logging.basicConfig(level=logging.INFO, handlers=[console_handler])
+
+
+warnings.simplefilter(action="ignore", category=RuntimeWarning)
+logger = logging.getLogger(__name__)
+init_logger()
+
 
 def import_privat_bank_csv(file_path):
     """Import transactions from PrivatBank CSV file."""
-    superuser = User.objects.filter(is_superuser=True).first()
-    if not superuser:
+    logger.info(f"Starting import of PrivatBank CSV: {file_path}")
+
+    # TODO: Implement different users, not just superuser
+    user = User.objects.filter(is_superuser=True).first()
+    if not user:
+        logger.error("No superuser found in the database!")
         raise ValueError("No superuser found in the database!")
 
     success_count = 0
@@ -17,8 +53,7 @@ def import_privat_bank_csv(file_path):
 
     try:
         with open(file_path, mode="r", encoding="utf-8") as file:
-            next(file) # Skip the first line as it contains the date range
-
+            next(file)  # Skip the first line as it contains the date range
             reader = csv.DictReader(file)
 
             for row_number, row in enumerate(
@@ -30,33 +65,23 @@ def import_privat_bank_csv(file_path):
 
                     # Parse amount and determine transaction type
                     amount = Decimal(row["Сума в валюті картки"].replace(",", "."))
-                    if amount < 0:
-                        type = "expense"
-                        amount = abs(amount)
-                    else:
-                        type = "income"
+                    type = "income" if amount > 0 else "expense"
+                    amount = abs(amount)
 
-                    # Parse original amount
+                    # Parse original amount, and balance
                     original_amount = Decimal(
                         row["Сума в валюті транзакції"].replace(",", ".")
                     )
-                    if type == "expense":
-                        original_amount = abs(original_amount)
-
-                    # Parse balance
                     balance = Decimal(
                         row["Залишок на кінець періоду"].replace(",", ".")
                     )
-                    
-                    # Get vendor
-                    vendor = row["Опис операції"].strip("*")
-                    
+
                     # Create transaction
                     Transaction.objects.create(
-                        user=superuser,
+                        user=user,
                         date=date,
                         card=row["Картка"],
-                        vendor=vendor,
+                        vendor=row["Опис операції"].strip("*"),
                         type=type,
                         amount=amount,
                         currency=row["Валюта картки"],
@@ -66,41 +91,40 @@ def import_privat_bank_csv(file_path):
                         transaction_source="PrivatBank",
                     )
                     success_count += 1
+                    logger.info(f"Row {row_number}: Transaction imported successfully.")
 
-                except KeyError as e:
-                    error_msg = f"Row {row_number}: Missing required column: {str(e)}"
-                    error_messages.append(error_msg)
-                    error_count += 1
-                except ValueError as e:
-                    error_msg = f"Row {row_number}: Invalid value: {str(e)}"
-                    error_messages.append(error_msg)
                 except Exception as e:
-                    error_msg = f"Row {row_number}: Unexpected error: {str(e)}"
+                    error_msg = f"Row {row_number}: {str(e)}"
                     error_messages.append(error_msg)
                     error_count += 1
+                    logger.error(error_msg)
 
     except FileNotFoundError:
-        raise FileNotFoundError(f"CSV file not found at: {file_path}")
+        logger.critical(f"CSV file not found: {file_path}")
+        raise
     except Exception as e:
-        raise Exception(f"Error reading CSV file: {str(e)}")
+        logger.critical(f"Unexpected error reading CSV file: {str(e)}")
+        raise
 
     # Print summary
-    print("\nImport Summary:")
-    print(f"Successfully imported: {success_count} transactions")
-    if error_count:
-        print(f"Errors encountered: {error_count}")
-        print("\nError Details:")
-        for msg in error_messages:
-            print(f"- {msg}")
-
+    logger.info(
+        f"PrivatBank Import Summary: {success_count} successes, {error_count} errors."
+    )
     return success_count, error_count, error_messages
 
 
 def import_oschad_csv(file_path: str):
-    """Import transactions from an Oschad CSV file."""
-    superuser = User.objects.filter(is_superuser=True).first()
-    if not superuser:
+    """Import transactions from my manually written Oschad CSV file."""
+    logger.info(f"Starting import of Oschad CSV: {file_path}")
+
+    user = User.objects.filter(is_superuser=True).first()
+    if not user:
+        logger.error("No superuser found in the database!")
         raise ValueError("No superuser found in the database!")
+
+    success_count = 0
+    error_count = 0
+    error_messages = []
 
     def parse_oschad_date(date_str: str) -> datetime:
         """
@@ -109,13 +133,6 @@ def import_oschad_csv(file_path: str):
         Expected formats:
             "3 лютого 2025 00:00" or "3 лютого 2025"
         """
-        parts = date_str.strip().split()
-        if len(parts) < 3:
-            raise ValueError(f"Date string '{date_str}' has insufficient parts")
-
-        day = parts[0]
-        month_name = parts[1].lower()
-        year = parts[2]
         month_map = {
             "січня": "01",
             "лютого": "02",
@@ -130,7 +147,16 @@ def import_oschad_csv(file_path: str):
             "листопада": "11",
             "грудня": "12",
         }
-        month = month_map.get(month_name)
+
+        parts = date_str.strip().split()
+        if len(parts) < 3:
+            raise ValueError(f"Date string '{date_str}' has insufficient parts")
+
+        day = parts[0]
+        month_name = parts[1]
+        year = parts[2]
+
+        month = month_map.get(month_name.lower())
         if not month:
             raise ValueError(f"Unknown month name: {month_name}")
 
@@ -145,13 +171,8 @@ def import_oschad_csv(file_path: str):
 
         return datetime.strptime(date_formatted, fmt)
 
-    success_count = 0
-    error_count = 0
-    error_messages = []
-
     try:
         with open(file_path, mode="r", encoding="utf-8-sig", newline="") as file:
-            # Use DictReader to handle headers and possible extra empty columns.
             reader = csv.DictReader(file)
 
             # Normalize header keys by stripping whitespace.
@@ -160,23 +181,13 @@ def import_oschad_csv(file_path: str):
 
             for row_number, row in enumerate(reader, start=2):
                 try:
-                    # Ensure required fields exist (e.g., date and description).
-                    # Good but description can blank, and date can't be blank, so the point is not valid
-                    # if not row.get("date") or not row.get("description"):
-                    #     raise ValueError("Missing required fields in row")
-
-                    # Parse date using the custom parser.
+                    # Parse date
                     date = parse_oschad_date(row["date"])
 
-                    # Determine vendor and description.
-                    # Use "who" for vendor; if not available, fallback to "on_what".
+                    # Determine vendor and description. Use "who" for vendor; if not available, fallback to "on_what".
                     vendor_raw = row.get("who") or row.get("on_what") or ""
                     vendor = vendor_raw.strip("*").strip()
-
-                    # Handle the typo in the header: use "decription" if "description" is absent.
-                    description = (
-                        row.get("description") or row.get("decription") or ""
-                    ).strip()
+                    description = row.get("description").strip()
 
                     # Get income and debits values.
                     income_str = row.get("income", "").strip()
@@ -193,13 +204,10 @@ def import_oschad_csv(file_path: str):
                         raise ValueError("No valid amount found in row")
 
                     # Parse balance, if provided.
-                    balance_raw = row.get("balance", "").strip()
-                    balance_after_transaction = (
-                        Decimal(balance_raw.replace(",", ".")) if balance_raw else None
-                    )
+                    balance = Decimal(row.get("balance", "0").replace(",", "."))
 
                     Transaction.objects.create(
-                        user=superuser,
+                        user=user,
                         date=date,
                         card="5167 **** **** 8163",
                         type=transaction_type,
@@ -207,28 +215,23 @@ def import_oschad_csv(file_path: str):
                         currency="UAH",
                         description=description,
                         vendor=vendor,
-                        balance_after_transaction=balance_after_transaction,
+                        balance_after_transaction=balance,
                         transaction_source="OschadBank",
                     )
                     success_count += 1
-                except KeyError as e:
-                    error_messages.append(
-                        f"Row {row_number}: Missing required column: {str(e)}"
-                    )
-                    error_count += 1
+                    logger.info(f"Row {row_number}: Transaction imported successfully.")
+
                 except Exception as e:
-                    error_messages.append(f"Row {row_number}: Error: {str(e)}")
+                    error_msg = f"Row {row_number}: {str(e)}"
+                    error_messages.append(error_msg)
                     error_count += 1
+                    logger.error(error_msg)
     except FileNotFoundError:
-        raise FileNotFoundError(f"CSV file not found at: {file_path}")
+        logger.critical(f"CSV file not found: {file_path}")
+        raise
     except Exception as e:
-        raise Exception(f"Error reading CSV file: {str(e)}")
+        logger.critical(f"Unexpected error reading CSV file: {str(e)}")
+        raise
 
-    print("\nImport Summary (Oschad):")
-    print(f"Successfully imported: {success_count} transactions")
-    if error_count:
-        print(f"Errors encountered: {error_count}")
-        for msg in error_messages:
-            print(f"- {msg}")
-
+    logger.info(f"OschadBank Import Summary: {success_count} successes, {error_count} errors.")
     return success_count, error_count, error_messages
