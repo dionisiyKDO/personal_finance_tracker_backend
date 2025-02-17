@@ -1,15 +1,13 @@
 from django.contrib.auth.models import User
-from django.utils import timezone
-
 from transactions.models import Transaction
 
 from datetime import datetime
 from decimal import Decimal
 import csv
 
-import warnings
 import logging
 import colorlog
+import pytz
 
 
 def init_logger():
@@ -32,7 +30,7 @@ def init_logger():
     logging.basicConfig(level=logging.INFO, handlers=[console_handler])
 
 
-warnings.simplefilter(action="ignore", category=RuntimeWarning)
+KYIV_TZ = pytz.timezone("Europe/Kyiv")
 logger = logging.getLogger(__name__)
 init_logger()
 
@@ -62,6 +60,7 @@ def import_privat_bank_csv(file_path):
                 try:
                     # Parse and validate date
                     date = datetime.strptime(row["Дата"], "%d.%m.%Y %H:%M:%S")
+                    date = KYIV_TZ.localize(date)
 
                     # Parse amount and determine transaction type
                     amount = Decimal(row["Сума в валюті картки"].replace(",", "."))
@@ -183,6 +182,7 @@ def import_oschad_csv(file_path: str):
                 try:
                     # Parse date
                     date = parse_oschad_date(row["date"])
+                    date = KYIV_TZ.localize(date)
 
                     # Determine vendor and description. Use "who" for vendor; if not available, fallback to "on_what".
                     vendor_raw = row.get("who") or row.get("on_what") or ""
@@ -233,5 +233,7 @@ def import_oschad_csv(file_path: str):
         logger.critical(f"Unexpected error reading CSV file: {str(e)}")
         raise
 
-    logger.info(f"OschadBank Import Summary: {success_count} successes, {error_count} errors.")
+    logger.info(
+        f"OschadBank Import Summary: {success_count} successes, {error_count} errors."
+    )
     return success_count, error_count, error_messages
