@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import re
 
 
 class Transaction(models.Model):
@@ -39,7 +40,67 @@ class Transaction(models.Model):
         "OschadBank (fee)": "Finance/BankFees",
         "NU Zaporizhzhia Polytechnic (other payments)": "Education/University",
     }
-
+    
+    VENDOR_MAP = {
+        "Мобильный": "Mobile Service Provider",
+        "MONODirect KYIV UKR": "MONO Bank (Ukraine)",
+        "На другую карту": "Transfer to Another Card",
+        "С другой карты": "From Another Card",
+        "Стипендия": "NU Zaporizhzhia Polytechnic: Scholarship",
+        "Нова пошта": "Nova Poshta (Courier Service)",
+        "UDEMY ONLINE COURSES": "Udemy",
+        "Терминал": "Terminal (ATM/POS)",
+        "GOOGLE *Duolingo": "Google play (Duolingo)",
+        "RozetkaPay": "Rozetka (Online Store)",
+        "RAHIMI31": "unknown",
+        "IBOX BANK A2C": "Terminal (ATM/POS)",
+        "IBOX CASH TO CARD": "Terminal (ATM/POS)",
+        "Amazon Video*2P28C8DW4": "Amazon Prime Video",
+        "MooGold Enterprise": "MooGold (Gaming/Online Service)",
+        "GLOBAL24": "unknown",
+        
+        "Сільпо": "Zaporizhzhia Store (Ukraine)",
+        "Kompyuteritakomplektuy": "Zaporizhzhia Store (Ukraine)",
+        "L10A ZAPOROZHYE UKR": "Zaporizhzhia Store (Ukraine)",
+        "ZAPOROZHYE UKR MAGAZIN": "Zaporizhzhia Store (Ukraine)",
+        "MAGAZIN ZAPOROZHYE UKR": "Zaporizhzhia Store (Ukraine)",
+        "Kompyuterii41": "Zaporizhzhia Store (Ukraine)",
+        
+        "Spotify AB": "Spotify",
+        "Spotify": "Spotify",
+        
+        "STEAM PURCHASE": "Steam",
+        "STEAM Refund": "Steam",
+        "Steam": "Steam",
+        
+        "HoYoverse": "HoYoverse",
+        "COGNOSPHERE PTE. LTD": "HoYoverse",
+        "MIHOYO LIMITED": "HoYoverse",
+        "HoYoverse, Singapore": "HoYoverse",
+        
+        "RIOT*LOL": "Riot Games",
+        "GOOGLE *YOSTAR LIMITED": "Google (Yostar Games)",
+        "HS_TowerofFantasy": "Tower of Fantasy (Game)",
+        
+        "XSOLLA *EPICGAMES": "Xsolla (Epic Games)",
+        "XSOLLA /EPICGAMES": "Xsolla (Epic Games)",
+        "Xsolla _Twitch": "Xsolla (Twitch)",
+        "XSOLLA *TWITCH": "Xsolla (Twitch)",
+        "XSOLLA": "Xsolla (Payment Platform)",
+        
+        # delete after
+        "Банк": "OschadBank (fee)",
+        
+        # PrivatBank
+        "На картку": "Transfer to Another Card",
+        "Стипендія": "NU Zaporizhzhia Polytechnic: Scholarship",
+        "Банкомат Супермаркет Амстор, М ЗАПОРІЖЖЯ, ВУЛ. БОРОДІНСЬКА, БУД. 20 Б": "Terminal (ATM/POS)",
+        "Infold Games, SG": "Infold Games",
+        "WEB Banking, KYIV": "From Another Card",
+        "Запорізька політехніка НУ (інші платежі)": "NU Zaporizhzhia Polytechnic (other payments)",
+        "MOBILE BANKING, KYIV": "From Another Card",
+    }
+    
     # Required fields
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="transactions"
@@ -103,7 +164,13 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         if not self.currency and self.original_currency:
             self.currency = self.original_currency
-        # TODO: check default category value
         if self.vendor:
-            self.category = self.CATEGORY_MAP.get(self.vendor, "Uncategorized")
+            phone_pattern = r"^\+380\d{9}$"
+            if re.match(phone_pattern, self.vendor):
+                self.vendor = "Mobile Service Provider"
+            else:
+                self.vendor = self.VENDOR_MAP.get(self.vendor, self.vendor)
+            
+            # TODO: look what is in category before this
+            self.category = self.CATEGORY_MAP.get(self.vendor, "Uncategorized")    
         super().save(*args, **kwargs)
